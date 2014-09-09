@@ -1,8 +1,8 @@
 #ifndef THREAD_H
 #define THREAD_H
-enum ThreadState = { RUNNING, READY, SLEEPING, SUSPENDED, CREATED };
+enum ThreadState { RUNNING, READY, SLEEPING, SUSPENDED, CREATED };
 
-struct Statistics {
+struct statistics {
   unsigned int noOfBursts;
   double totalExecutionTime;
   double totalSleepingTime;
@@ -10,16 +10,25 @@ struct Statistics {
   double avgWaitingTime;
 };
 
-Class Thread {
-  static int next_thread_Id = 0;
+class Thread {
+  static int next_thread_Id;
   int threadId;
   ThreadState state;
-  Statistics thread_stat;
+  statistics *thread_stat;
 
   public:
     Thread();
     int getID();
-    void sleep(int sec);
+    void sleep(int);
+    void yield();
+    void setState(int);
+    int getState();
+    unsigned int getBurstCount();
+    double getTotalExecutionTime();
+    double getTotalSleepingTime();
+    double getAvgExecutionTimeQuantum();
+    double getAvgWaitingTime();
+    statistics*  getStatistics();
 };
 
 #endif /* THREAD_H */
