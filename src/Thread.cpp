@@ -4,16 +4,33 @@ using namespace std;
 
 int Thread::next_thread_Id = 0;
 
-Thread::Thread(void (*f)(void)) {
+Thread::Thread(void (*function)(void)) {
   threadId = next_thread_Id++;
   state = CREATED;
-  functionPointer=f;
+  functionPointer=function;
   thread_stat = new statistics;
   thread_stat->noOfBursts = -1;
   thread_stat->totalExecutionTime = 0;
   thread_stat->totalSleepingTime = 0;
   thread_stat->avgExecutionTimeQuantum = 0;
   thread_stat->avgWaitingTime = 0;
+  withArguments = false;
+  cStack = new char[4096];
+}
+
+Thread::Thread(void* (*function)(void*), void* arguments) {
+  threadId = next_thread_Id++;
+  state = CREATED;
+  functionWithArg=function;
+  thread_stat = new statistics;
+  thread_stat->noOfBursts = -1;
+  thread_stat->totalExecutionTime = 0;
+  thread_stat->totalSleepingTime = 0;
+  thread_stat->avgExecutionTimeQuantum = 0;
+  thread_stat->avgWaitingTime = 0;
+  withArguments = true;
+  cStack = new char[4096];
+  this->arguments = arguments;
 }
 
 int Thread::getID() {

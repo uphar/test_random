@@ -5,8 +5,8 @@
 #include <map>
 #include <vector>
 
-std::map<int, Thread*> threadMap;
-std::vector<Thread*> readyQueue;  // can just maintain list of threadIds instead of entire thread contents
+// extern std::map<int, Thread*> threadMap;
+// extern std::vector<Thread*> readyQueue;  // can just maintain list of threadIds instead of entire thread contents
 
 
 
