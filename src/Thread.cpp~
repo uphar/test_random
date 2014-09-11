@@ -16,11 +16,6 @@ Thread::Thread(void (*f)(void)) {
   thread_stat->avgWaitingTime = 0;
 }
 
-/*static void Thread::setThreadIdToZero()
-{
-  next_thread_Id = 0;
-}*/
-
 int Thread::getID() {
   return threadId;
 }

@@ -2,8 +2,8 @@
 #include<iostream>
 using namespace std;
 
-std::map<int, Thread*> threadMap;
-std::vector<Thread*> readyQueue;  // can just maintain list of threadIds instead of entire thread contents
+extern std::map<int, Thread*> threadMap;
+extern std::vector<Thread*> readyQueue;  
 
 void start() {
   //code to start timer and execution of threads
@@ -15,14 +15,18 @@ void start() {
   while(1)
   {
     thread=*it;
+    thread->setState(READY);
     functionPointer=thread->getFunctionPointer();
     functionPointer();
     it++;
     if(it==readyQueue.end())
-      it=readyQueue.begin();
+      break;
+      //it=readyQueue.begin();
   }
 
 }
+
+
 
 int create(void (*functionPointer)(void))
 {
@@ -122,6 +126,42 @@ statistics* getStatus(int threadId) {
   return NULL;
 }
 
+void printStatus(int threadId)
+{
+  std::map<int,Thread*>::iterator it;
+  it=threadMap.find(threadId);
+  Thread *thread = it->second;
+  cout<<"Thread Id: "<<thread->getID()<<endl;
+  int threadState = thread->getState();
+
+    switch(threadState) {
+      case 0:
+        cout<<"Thread State: RUNNING"<<endl;
+        break;
+      case 1:
+        cout<<"Thread State: READY"<<endl;
+        break;
+      case 2:
+        cout<<"Thread State: SLEEPING"<<endl;
+        break;
+      case 3:
+        cout<<"Thread State: SUSPENDED"<<endl;
+        break;
+      case 4:
+        cout<<"Thread State: CREATED"<<endl;
+        break;
+    }
+
+    cout<<"Thread Burst Count: "<<thread->getBurstCount()<<endl;
+    cout<<"Thread Total Execution Time: "<<thread->getTotalExecutionTime()<<endl;
+    cout<<"Thread Total Sleeping Time: "<<thread->getTotalSleepingTime()<<endl;
+    cout<<"Thread Average Execution Time Quantum: "<<thread->getAvgExecutionTimeQuantum()<<endl;
+    cout<<"Thread Average Waiting Time: "<<thread->getAvgWaitingTime()<<endl;
+    cout<<endl;
+  
+
+
+}
 void clean() {
   //stop timer
   std::map<int, Thread*>::iterator it;

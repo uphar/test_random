@@ -41,7 +41,7 @@ int Thread::getState() {
   return state;
 }
 
-unsigned int Thread::getBurstCount() {
+unsigned int Thread::getBurstCount() {  //why such a return type
   return thread_stat->noOfBursts;
 }
 
