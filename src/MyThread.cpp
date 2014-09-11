@@ -1,7 +1,30 @@
 #include "MyThread.h"
-
+#include<iostream>
+using namespace std;
 void start() {
   //code to start timer and execution of threads
+ // Thread::setThreadIdToZero();
+  void (*functionPointer)(void);
+  std::vector<Thread*>::iterator it;
+  Thread *thread;
+  it=readyQueue.begin();
+  while(1)
+  {
+    thread=*it;
+    functionPointer=thread->getFunctionPointer();
+    functionPointer();
+    it++;
+  }
+
+}
+
+int create(void (*functionPointer)(void))
+{
+  Thread* t=new Thread(functionPointer);
+  int readyQueueSize=readyQueue.size();
+  readyQueue.push_back(t);
+  
+  return t->getID();
 }
 
 void run(int threadId) {
@@ -10,7 +33,7 @@ void run(int threadId) {
 
   if (it != threadMap.end()) {
     Thread* thread = it->second;
-    thread->updateState(RUNNING);
+    thread->setState(RUNNING);        ///// need for updateState() ??
     //update ready queue here
   }
 }
@@ -21,7 +44,7 @@ void suspend(int threadId) {
 
   if (it != threadMap.end()) {
     Thread* thread = it->second;
-    thread->updateState(SUSPENDED);
+    thread->setState(SUSPENDED);
     //update ready queue here
   }
 }
@@ -62,19 +85,19 @@ statistics* getStatus(int threadId) {
     return thread->getStatistics();
   }
 
-  return null;
+  return NULL;
 }
 
 void clean() {
   //stop timer
   std::map<int, Thread*>::iterator it;
   Thread* thread;
-  int thredState;
+  int threadState;
 
   for(it = threadMap.begin(); it != threadMap.end(); it++) {
     thread = it->second;
-    cout<<"Thread Id: "<<thread.getID()<<endl;
-    threadState = thread.getState();
+    cout<<"Thread Id: "<<thread->getID()<<endl;
+    threadState = thread->getState();
 
     switch(threadState) {
       case 0:
@@ -94,11 +117,11 @@ void clean() {
         break;
     }
 
-    cout<<"Thread Burst Count: "<<thread.getBurstCount()<<endl;
-    cout<<"Thread Total Execution Time: "<<thread.getTotalExecutionTime()<<endl;
-    cout<<"Thread Total Sleeping Time: "<<thread.getTotalSleepingTime()<<endl;
-    cout<<"Thread Average Execution Time Quantum: "<<thread.getAvgExecutionTimeQuantum()<<endl;
-    cout<<"Thread Average Waiting Time: "<<thread.getAvgWaitingTime()<<endl;
+    cout<<"Thread Burst Count: "<<thread->getBurstCount()<<endl;
+    cout<<"Thread Total Execution Time: "<<thread->getTotalExecutionTime()<<endl;
+    cout<<"Thread Total Sleeping Time: "<<thread->getTotalSleepingTime()<<endl;
+    cout<<"Thread Average Execution Time Quantum: "<<thread->getAvgExecutionTimeQuantum()<<endl;
+    cout<<"Thread Average Waiting Time: "<<thread->getAvgWaitingTime()<<endl;
     cout<<endl;
 
     delete thread->getStatistics();

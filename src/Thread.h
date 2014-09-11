@@ -11,17 +11,24 @@ struct statistics {
 };
 
 class Thread {
-  static int next_thread_Id;
+  
   int threadId;
+  void (*functionPointer)(void);
   ThreadState state;
   statistics *thread_stat;
 
   public:
-    Thread();
+    static int next_thread_Id; //////// convert to static
+    Thread(void (*f)(void));
+   // static void setThreadIdToZero();
     int getID();
+    void (*getFunctionPointer(void))(void)
+    {
+      return functionPointer;
+    }
     void sleep(int);
     void yield();
-    void setState(int);
+    void setState(ThreadState);
     int getState();
     unsigned int getBurstCount();
     double getTotalExecutionTime();
