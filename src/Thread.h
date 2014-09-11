@@ -1,5 +1,6 @@
 #ifndef THREAD_H
 #define THREAD_H
+#include<setjmp.h>
 enum ThreadState { RUNNING, READY, SLEEPING, SUSPENDED, CREATED };
 
 struct statistics {
@@ -16,11 +17,11 @@ class Thread {
   void (*functionPointer)(void);
   ThreadState state;
   statistics *thread_stat;
-
+  jmp_buf environment;
   public:
-    static int next_thread_Id; //////// convert to static
+    
+    static int next_thread_Id; 
     Thread(void (*f)(void));
-   // static void setThreadIdToZero();
     int getID();
     void (*getFunctionPointer(void))(void)
     {

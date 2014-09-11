@@ -3,7 +3,7 @@
 using namespace std;
 void start() {
   //code to start timer and execution of threads
- // Thread::setThreadIdToZero();
+
   void (*functionPointer)(void);
   std::vector<Thread*>::iterator it;
   Thread *thread;
@@ -20,11 +20,10 @@ void start() {
 
 int create(void (*functionPointer)(void))
 {
-  Thread* t=new Thread(functionPointer);
-  int readyQueueSize=readyQueue.size();
-  readyQueue.push_back(t);
-  
-  return t->getID();
+  Thread* thread=new Thread(functionPointer);
+  threadMap.insert( std::pair<int, Thread*>(thread->getID(),thread) );
+  readyQueue.push_back(thread);
+  return thread->getID();
 }
 
 void run(int threadId) {
@@ -34,22 +33,37 @@ void run(int threadId) {
   if (it != threadMap.end()) {
     Thread* thread = it->second;
     thread->setState(RUNNING);        ///// need for updateState() ??
+    readyQueue.push_back(thread);
     //update ready queue here
   }
 }
 
 void suspend(int threadId) {
+  int position=0;
   std::map<int, Thread*>::iterator it;
   it = threadMap.find(threadId);
 
   if (it != threadMap.end()) {
     Thread* thread = it->second;
     thread->setState(SUSPENDED);
+    
     //update ready queue here
+    std::vector<Thread*>::iterator threadIt;
+    threadIt=readyQueue.begin();
+    while(threadIt!=readyQueue.end())
+    {
+      position++;
+      if((*threadIt)->getID()!=thread->getID())
+      {
+        readyQueue.erase(threadIt);
+      }
+      threadIt++;
+    }
   }
 }
 
 void resume(int threadId) {
+  int position=0;
   std::map<int, Thread*>::iterator it;
   it = threadMap.find(threadId);
 
@@ -58,18 +72,32 @@ void resume(int threadId) {
 
     if (thread->getState() == SUSPENDED) {
       thread->setState(READY);
-      //update ready queue here
+     
+     //update ready queue here
+     readyQueue.push_back(thread);
     }
   }
 }
 
 void deleteThread(int threadId) {
+  int position=0;
   std::map<int, Thread*>::iterator it;
   it = threadMap.find(threadId);
 
   if (it != threadMap.end()) {
     Thread* thread = it->second;
     threadMap.erase(it);
+    std::vector<Thread*>::iterator threadIt;
+    threadIt=readyQueue.begin();
+    while(threadIt!=readyQueue.end())
+    {
+      position++;
+      if((*threadIt)->getID()!=thread->getID())
+      {
+        readyQueue.erase(threadIt);
+      }
+      threadIt++;
+    }
     delete thread->getStatistics();
     delete thread;
     //update ready queue here

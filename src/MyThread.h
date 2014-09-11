@@ -5,9 +5,9 @@
 #include <map>
 #include <vector>
 
-std::map<int, Thread*> threadMap;
-std::vector<Thread*> readyQueue;
 
+std::map<int, Thread*> threadMap;
+std::vector<Thread*> readyQueue; // can just maintain list of threadIds instead of entire thread contents
 
 int create(void (*f)(void));
 void dispatch(int sig);
