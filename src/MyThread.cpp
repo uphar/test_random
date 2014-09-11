@@ -1,6 +1,10 @@
 #include "MyThread.h"
 #include<iostream>
 using namespace std;
+
+std::map<int, Thread*> threadMap;
+std::vector<Thread*> readyQueue;  // can just maintain list of threadIds instead of entire thread contents
+
 void start() {
   //code to start timer and execution of threads
 
@@ -14,6 +18,8 @@ void start() {
     functionPointer=thread->getFunctionPointer();
     functionPointer();
     it++;
+    if(it==readyQueue.end())
+      it=readyQueue.begin();
   }
 
 }
