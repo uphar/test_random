@@ -21,6 +21,11 @@ statistics* getStatus(int threadId);
 void printStatus(int threadId);
 int createWithArgs(void* (*f)(void*), void *arg);
 void clean();
+void yield();
+void initTimer();
+void saveContext();
+void resumeContext();
+void terminate(int threadId);
 
 
 #endif /* MYTHREAD_H */

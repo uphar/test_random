@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <cstdlib>
+#include <setjmp.h>
 
 #define INTERVAL 1000
 
@@ -10,21 +11,31 @@ using namespace std;
 
 std::map<int, Thread*> threadMap;
 std::vector<int> readyQueue;
-std::vector<int>::iterator currentThread;
+bool initial_start = true; //instead of this a bool value can be used
 
 void start() {
   //code to start timer and execution of threads
 
   std::map<int, Thread*>::iterator it;
   Thread *thread;
-  struct itimerval it_val;
 
   for (it=threadMap.begin(); it != threadMap.end(); it++) {
   	thread = it->second;
   	thread->setState(READY);
   	readyQueue.push_back(thread->getID());
-  	currentThread = readyQueue.end();
   }
+
+  initTimer();
+  dispatch(0);
+  initial_start = false;
+  cout<<"Ready queue "<<readyQueue.size()<<endl;
+  
+  while(1) {}//infinite loop to stop termination of program
+
+}
+
+void initTimer() {
+  struct itimerval it_val;
 
   if (signal(SIGVTALRM, (void (*)(int)) dispatch) == SIG_ERR) {
     cout<<"Unable to catch SIGALRM"<<endl;
@@ -34,37 +45,74 @@ void start() {
   it_val.it_value.tv_sec =     INTERVAL/1000;
   it_val.it_value.tv_usec =    (INTERVAL*1000) % 1000000;        
   it_val.it_interval = it_val.it_value;
+
   if (setitimer(ITIMER_VIRTUAL, &it_val, NULL) == -1) {
     cout<<"error calling setitimer()"<<endl;
     exit(1);
   }
-  
-  while(1) {}//infinite loop to stop termination of program
-
 }
 
-void dispatch(int signal) {
-  if (readyQueue.size() > 0) {
-  	if (currentThread != readyQueue.end()) {
-  	  //save context
-  		cout<<"Save thread context "<<*currentThread<<endl;
-    }
+void saveContext() {
+  if (!initial_start && readyQueue.size() > 0) {
+  	int threadId = *readyQueue.begin();
+  	cout<<"Save thread context "<<threadId<<endl;
+  	Thread *thread = threadMap.find(threadId)->second;
+  	readyQueue.push_back(threadId);
+  	readyQueue.erase(readyQueue.begin());
 
-    currentThread = (currentThread != readyQueue.end() && currentThread + 1 != readyQueue.end() ? ++currentThread : readyQueue.begin());
-	int threadId = *currentThread;
+  	if (thread->getState() == RUNNING) {
+  	  thread->setState(READY);
+  	  setjmp((threadMap.find(threadId))->second->environment);
+  	}
+  }
+}
+
+void resumeContext() {
+  if (readyQueue.size() > 0) {
+    int threadId = *(readyQueue.begin());
   	std::map<int, Thread*>::iterator it;
     it = threadMap.find(threadId);
 
   	if (it != threadMap.end()) {
-  	  //thread.run();
-  	  cout<<"Run thread "<<threadId<<endl;
+  	  Thread *thread = it->second;
+  	  if (thread->getState() == READY) {
+  	    thread->thread_stat->noOfBursts++;
+  	    thread->setState(RUNNING);
+  	    cout<<"Running "<<threadId<<endl;
+
+  	    // if (thread->getBurstCount() == 0) {
+  	  	 //  if (thread->isWithArguments()) {
+       //      thread->returnValue = thread->functionWithArg(thread->getArguments());
+  	  	 //  } else {
+  	  	 //    thread->functionPointer();
+  	  	 //  }
+
+  	  	 //  terminate(thread->getID());
+  	    // } else {
+          longjmp(thread->environment, 1);
+  	    // }
+  	  }
   	}
   }
+}
+
+void dispatch(int signal) {
+  if (readyQueue.size() > 0) {
+  	saveContext();
+  	resumeContext();
+  } else {
+  	cout<<"noting to do"<<endl;
+  }
+}
+
+void yield() {
+  dispatch(0);
 }
 
 int create(void (*functionPointer)(void)) {
   Thread* thread = new Thread(functionPointer);
   threadMap.insert(std::pair<int, Thread*>(thread->getID(),thread));
+  //if status is made ready in constructor then update map and queue here
   return thread->getID();
 }
 
@@ -75,35 +123,45 @@ int createWithArgs(void* (*functionPointer)(void*), void* arguments) {
 }
 
 void run(int threadId) {
-  std::map<int, Thread*>::iterator it;
-  it = threadMap.find(threadId);
+  std::vector<int>::iterator it;
+  for (it = readyQueue.begin(); it != readyQueue.end(); it++) {
+    if (*it == threadId) {
+      break;
+    }
+  }
 
-  if (it != threadMap.end()) {
-    Thread* thread = it->second;
-    thread->setState(RUNNING);        ///// need for updateState() ??
-    readyQueue.push_back(thread->getID());
-    //update ready queue here
+  if (it != readyQueue.end()) {
+  	saveContext();
+  	readyQueue.erase(it);
+  	readyQueue.insert(readyQueue.begin(), threadId);
+  	resumeContext(); //check if we need to inittimer here again to reset
   }
 }
 
 void suspend(int threadId) {
-  std::map<int, Thread*>::iterator it;
-  it = threadMap.find(threadId);
-
-  if (it != threadMap.end()) {
-    Thread* thread = it->second;
-    thread->setState(SUSPENDED);
+  std::vector<int>::iterator it;
+  for (it = readyQueue.begin(); it != readyQueue.end(); it++) {
+    if (*it == threadId) {
+      break;
+    }
   }
 
-  //update ready queue here
-  std::vector<int>::iterator threadIt;
-  threadIt = readyQueue.begin();
-  while(threadIt != readyQueue.end()) {
-    if(*threadIt == threadId) {
-      readyQueue.erase(threadIt);
-    }
+  if (it != readyQueue.end()) {
+  	if (it == readyQueue.begin()) {
+  	  saveContext();
+  	  resumeContext(); //check if we need to inittimer here again to reset
+  	  readyQueue.pop_back();
+  	} else {
+  	  readyQueue.erase(it);
+  	}
+  }
 
-    threadIt++;
+  std::map<int, Thread*>::iterator threaMapIt;
+  threaMapIt = threadMap.find(threadId);
+
+  if (threaMapIt != threadMap.end()) {
+    Thread* thread = threaMapIt->second;
+    thread->setState(SUSPENDED);
   }
 }
 
@@ -116,35 +174,69 @@ void resume(int threadId) {
 
     if (thread->getState() == SUSPENDED) {
       thread->setState(READY);
-
-      //update ready queue here
       readyQueue.push_back(threadId);
     }
   }
 }
 
 void deleteThread(int threadId) {
-  std::map<int, Thread*>::iterator it;
-  it = threadMap.find(threadId);
-
-  if (it != threadMap.end()) {
-    Thread* thread = it->second;
-    threadMap.erase(it);
-    std::vector<int>::iterator threadIt;
-    threadIt = readyQueue.begin();
-    while(threadIt != readyQueue.end())
-    {
-      if(*threadIt == threadId)
-      {
-        readyQueue.erase(threadIt);
-      }
-      threadIt++;
+  std::vector<int>::iterator it;
+  for (it = readyQueue.begin(); it != readyQueue.end(); it++) {
+    if (*it == threadId) {
+      break;
     }
-
-    delete thread->getStatistics();
-    delete thread;
-    //update ready queue here
   }
+
+  if (it != readyQueue.end()) {
+  	if (it == readyQueue.begin()) {
+  	  readyQueue.erase(readyQueue.begin());
+  	  resumeContext(); //check if we need to inittimer here again to reset
+  	} else {
+  	  readyQueue.erase(it);
+  	}
+  }
+
+  std::map<int, Thread*>::iterator threaMapIt;
+  threaMapIt = threadMap.find(threadId);
+
+  if (threaMapIt != threadMap.end()) {
+    Thread* thread = threaMapIt->second;
+    threadMap.erase(threaMapIt);
+    delete thread->getStatistics();
+    delete thread->cStack;
+    delete thread;
+  }
+}
+
+void terminate(int threadId) {
+  std::vector<int>::iterator it;
+  for (it = readyQueue.begin(); it != readyQueue.end(); it++) {
+    if (*it == threadId) {
+      break;
+    }
+  }
+
+  if (it != readyQueue.end()) {
+  	if (it == readyQueue.begin()) {
+  	  readyQueue.erase(readyQueue.begin());
+  	  resumeContext(); //check if we need to inittimer here again to reset
+  	  // cout<<"in terminate"<<endl;
+
+  	  // readyQueue.pop_back();
+  	} else {
+  	  readyQueue.erase(it);
+  	}
+  }
+
+  std::map<int, Thread*>::iterator threaMapIt;
+  threaMapIt = threadMap.find(threadId);
+
+  if (threaMapIt != threadMap.end()) {
+    Thread* thread = threaMapIt->second;
+    thread->setState(TERMINATED);
+  }
+
+  // cout<<"in terminate"<<endl;
 }
 
 statistics* getStatus(int threadId) {
@@ -240,6 +332,7 @@ void clean() {
     cout<<endl;
 
     delete thread->getStatistics();
+    delete thread->cStack;
     delete thread;
   }
 
