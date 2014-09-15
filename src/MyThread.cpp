@@ -29,8 +29,8 @@ void start() {
   //initTimer();
   
   //dispatch();
+  signal(SIGALRM, dispatch);
   alarm(INTERVAL);
-  signal(SIGALRM, alarm_handler);
   siglongjmp(threadMap.find(*readyQueue.begin())->second->environment, 1);
   initial_start = false;
   cout<<"Ready queue "<<readyQueue.size()<<endl;
@@ -82,7 +82,7 @@ void saveContext() {
 
   	if (thread->getState() == RUNNING) {
   	  thread->setState(READY);
-  	  
+  	  sigsetjmp(thread->environment, 1);
   	}
   }
   
@@ -116,13 +116,8 @@ void resumeContext() {
   	}
   }
 }
-void alarm_handler(int dummy)
-{
-  alarm(1);
-  signal(SIGALRM, alarm_handler);
-  dispatch();
-}
-void dispatch() {
+
+void dispatch(int sig) {
 
 
   if (readyQueue.size() > 0) {
@@ -136,6 +131,8 @@ void dispatch() {
         resumeContext();
         cout<<endl<<"switching to other function "<<*readyQueue.begin()<<endl;
         siglongjmp(threadMap.find((*readyQueue.begin()))->second->environment,1);
+        alarm(1);
+        signal(SIGALRM, dispatch);
   	
   	
   	
@@ -149,7 +146,7 @@ void dispatch() {
 }
 
 void yield() {
-  dispatch();
+  dispatch(0);
 }
 
 int create(void (*functionPointer)(void)) {

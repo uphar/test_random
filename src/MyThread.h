@@ -11,8 +11,7 @@
 
 
 int create(void (*f)(void));
-void dispatch();
-void alarm_handler(int);
+void dispatch(int);
 void start();
 void run(int threadId);
 void suspend(int threadId);
