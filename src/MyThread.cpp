@@ -82,7 +82,7 @@ void saveContext() {
 
   	if (thread->getState() == RUNNING) {
   	  thread->setState(READY);
-  	  sigsetjmp(thread->environment, 1);
+  	  // sigsetjmp(thread->environment, 1);
   	}
   }
   
