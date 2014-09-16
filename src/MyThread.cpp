@@ -127,14 +127,13 @@ void dispatch(int sig) {
         if (ret_val == 1) {
             return;
         }
+        alarm(1);
+        signal(SIGALRM, dispatch);
         saveContext();
         resumeContext();
         cout<<endl<<"switching to other function "<<*readyQueue.begin()<<endl;
         siglongjmp(threadMap.find((*readyQueue.begin()))->second->environment,1);
-        alarm(1);
-        signal(SIGALRM, dispatch);
-  	
-  	
+          	
   	
   	//initTimer();
   	//alarm(INTERVAL);
