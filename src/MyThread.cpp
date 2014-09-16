@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <setjmp.h>
 
-#define INTERVAL 1000
+#define INTERVAL 1
 
 using namespace std;
 
@@ -23,10 +23,15 @@ void start() {
   	thread = it->second;
   	thread->setState(READY);
   	readyQueue.push_back(thread->getID());
+  	cout<<"pushed::"<<thread->getID()<<endl;
   }
-
-  initTimer();
-  dispatch(0);
+  //sigsetjmp((threadMap.find(*readyQueue.begin()))->second->environment,1);
+  //initTimer();
+  
+  //dispatch();
+  alarm(INTERVAL);
+  signal(SIGALRM, alarm_handler);
+  siglongjmp(threadMap.find(*readyQueue.begin())->second->environment, 1);
   initial_start = false;
   cout<<"Ready queue "<<readyQueue.size()<<endl;
   
@@ -34,10 +39,12 @@ void start() {
 
 }
 
+/*
 void initTimer() {
   struct itimerval it_val;
 
-  if (signal(SIGVTALRM, (void (*)(int)) dispatch) == SIG_ERR) {
+  //if (signal(SIGVTALRM, (void (*)(int)) alarm_handl) == SIG_ERR) {
+  if (signal(SIGVTALRM, alarm_handl) == SIG_ERR) {
     cout<<"Unable to catch SIGALRM"<<endl;
     exit(1);
   }
@@ -51,20 +58,35 @@ void initTimer() {
     exit(1);
   }
 }
+*/
 
+void displayReadyQueue()
+{
+        std::vector<int>::iterator it;
+    it = readyQueue.begin();
+    while(it!=readyQueue.end())
+    {
+        cout<<(*it)<<endl;
+        it++;
+    }
+        
+}
 void saveContext() {
-  if (!initial_start && readyQueue.size() > 0) {
+  if (readyQueue.size() > 0) {
   	int threadId = *readyQueue.begin();
   	cout<<"Save thread context "<<threadId<<endl;
   	Thread *thread = threadMap.find(threadId)->second;
   	readyQueue.push_back(threadId);
   	readyQueue.erase(readyQueue.begin());
+  	//displayReadyQueue();
 
   	if (thread->getState() == RUNNING) {
   	  thread->setState(READY);
-  	  setjmp((threadMap.find(threadId))->second->environment);
+  	  
   	}
   }
+  
+  
 }
 
 void resumeContext() {
@@ -78,7 +100,6 @@ void resumeContext() {
   	  if (thread->getState() == READY) {
   	    thread->thread_stat->noOfBursts++;
   	    thread->setState(RUNNING);
-  	    cout<<"Running "<<threadId<<endl;
 
   	    // if (thread->getBurstCount() == 0) {
   	  	 //  if (thread->isWithArguments()) {
@@ -89,24 +110,46 @@ void resumeContext() {
 
   	  	 //  terminate(thread->getID());
   	    // } else {
-          longjmp(thread->environment, 1);
+        //  siglongjmp(thread->environment,1);
   	    // }
   	  }
   	}
   }
 }
+void alarm_handler(int dummy)
+{
+  alarm(1);
+  signal(SIGALRM, alarm_handler);
+  dispatch();
+}
+void dispatch() {
 
-void dispatch(int signal) {
+
   if (readyQueue.size() > 0) {
-  	saveContext();
-  	resumeContext();
+  	
+        int ret_val = sigsetjmp(threadMap.find((*readyQueue.begin()))->second->environment,1);
+        cout<<"SWITCH: ret_val="<<ret_val<<endl;
+        if (ret_val == 1) {
+            return;
+        }
+        saveContext();
+        resumeContext();
+        cout<<endl<<"switching to other function "<<*readyQueue.begin()<<endl;
+        siglongjmp(threadMap.find((*readyQueue.begin()))->second->environment,1);
+  	
+  	
+  	
+  	//initTimer();
+  	//alarm(INTERVAL);
+  	//signal(SIGALRM, dispatch);
+  	
   } else {
-  	cout<<"noting to do"<<endl;
+  	cout<<"nothing to do"<<endl;
   }
 }
 
 void yield() {
-  dispatch(0);
+  dispatch();
 }
 
 int create(void (*functionPointer)(void)) {

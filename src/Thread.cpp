@@ -1,6 +1,6 @@
 #include "Thread.h"
 #include <iostream>
-
+#define STACK_SIZE 4096
 using namespace std;
 
 int Thread::next_thread_Id = 0;
@@ -16,9 +16,12 @@ Thread::Thread(void (*function)(void)) {
   thread_stat->avgExecutionTimeQuantum = 0;
   thread_stat->avgWaitingTime = 0;
   withArguments = false;
-  cStack = new char[4096];
+  cStack = new char[STACK_SIZE];
+  
   unsigned long programCounter = (unsigned long)functionPointer; /* func is a pointer to function associated with the thread */
-  unsigned long stackPointer = (unsigned long)cStack; /* stack is a pointer to the execution stack */
+  unsigned long stackPointer = (unsigned long)cStack+STACK_SIZE-sizeof(unsigned long); /* stack is a pointer to the execution stack */
+  sigsetjmp(environment, 1);
+  
   cout<<hex<<programCounter<<"    "<<stackPointer<<endl;
   #if defined(__x86_64__)
     cout<<"hie"<<endl;
@@ -35,11 +38,12 @@ Thread::Thread(void (*function)(void)) {
   #endif
   cout<<hex<<programCounter<<"    "<<stackPointer<<endl;
   cout<<dec<<JB_PC<<"    "<<JB_SP<<endl;
-  environment[0].__jmpbuf[JB_SP] = stackPointer;
-  environment[0].__jmpbuf[JB_PC] = programCounter;
-  cout<<hex<<environment[0].__jmpbuf[JB_SP]<<"    "<<environment[0].__jmpbuf[JB_PC]<<endl;
-}
-
+  environment->__jmpbuf[JB_SP] = stackPointer;
+  environment->__jmpbuf[JB_PC] = programCounter;
+  cout<<hex<<environment->__jmpbuf[JB_SP]<<"    "<<environment->__jmpbuf[JB_PC]<<endl;
+  sigemptyset(&environment->__saved_mask);
+}               
+        
 Thread::Thread(void* (*function)(void*), void* arguments) {
   threadId = next_thread_Id++;
   state = CREATED;
@@ -56,7 +60,6 @@ Thread::Thread(void* (*function)(void*), void* arguments) {
   returnValue = NULL;
   unsigned long programCounter = (unsigned long)functionWithArg; /* func is a pointer to function associated with the thread */
   unsigned long stackPointer = (unsigned long)cStack; /* stack is a pointer to the execution stack */
-  // cout<<hex<<p1<<"    "<<p2<<endl;
   #if defined(__x86_64__)
     cout<<"hie"<<endl;
     #define JB_SP 6 
@@ -70,7 +73,6 @@ Thread::Thread(void* (*function)(void*), void* arguments) {
     __asm__ __volatile__("xorl %%gs:0x18, %0\n\troll $9, %0" : "=r"(programCounter) : "r"(programCounter));
     __asm__ __volatile__("xorl %%gs:0x18, %0\n\troll $9, %0" : "=r"(stackPointer) : "r"(stackPointer));
   #endif
-  // cout<<hex<<p1<<"    "<<p2<<endl;
   environment[0].__jmpbuf[JB_SP] = stackPointer;
   environment[0].__jmpbuf[JB_PC] = programCounter;
 }
