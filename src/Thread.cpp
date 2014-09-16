@@ -22,25 +22,20 @@ Thread::Thread(void (*function)(void)) {
   unsigned long stackPointer = (unsigned long)cStack+STACK_SIZE-sizeof(unsigned long); /* stack is a pointer to the execution stack */
   sigsetjmp(environment, 1);
   
-  cout<<hex<<programCounter<<"    "<<stackPointer<<endl;
   #if defined(__x86_64__)
-    cout<<"hie"<<endl;
     #define JB_SP 6 
     #define JB_PC 7
     __asm__ __volatile__("xorq %%fs:0x30, %0\n\trolq $0x11, %0" : "=r"(programCounter) : "r"(programCounter));
     __asm__ __volatile__("xorq %%fs:0x30, %0\n\trolq $0x11, %0" : "=r"(stackPointer) : "r"(stackPointer));
   #elif defined(__i386__)
-    cout<<"bye"<<endl;
     #define JB_SP 4 
     #define JB_PC 5
     __asm__ __volatile__("xorl %%gs:0x18, %0\n\troll $9, %0" : "=r"(programCounter) : "r"(programCounter));
     __asm__ __volatile__("xorl %%gs:0x18, %0\n\troll $9, %0" : "=r"(stackPointer) : "r"(stackPointer));
   #endif
-  cout<<hex<<programCounter<<"    "<<stackPointer<<endl;
-  cout<<dec<<JB_PC<<"    "<<JB_SP<<endl;
+
   environment->__jmpbuf[JB_SP] = stackPointer;
   environment->__jmpbuf[JB_PC] = programCounter;
-  cout<<hex<<environment->__jmpbuf[JB_SP]<<"    "<<environment->__jmpbuf[JB_PC]<<endl;
   sigemptyset(&environment->__saved_mask);
 }               
         
@@ -58,25 +53,25 @@ Thread::Thread(void* (*function)(void*), void* arguments) {
   this->arguments = arguments;
   returnValue = NULL;
   cStack = new char[STACK_SIZE];
-  
   unsigned long programCounter = (unsigned long)functionWithArg; /* func is a pointer to function associated with the thread */
   unsigned long stackPointer = (unsigned long)cStack+STACK_SIZE-sizeof(unsigned long); /* stack is a pointer to the execution stack */
   sigsetjmp(environment, 1);
+
   #if defined(__x86_64__)
-    cout<<"hie"<<endl;
     #define JB_SP 6 
     #define JB_PC 7
     __asm__ __volatile__("xorq %%fs:0x30, %0\n\trolq $0x11, %0" : "=r"(programCounter) : "r"(programCounter));
     __asm__ __volatile__("xorq %%fs:0x30, %0\n\trolq $0x11, %0" : "=r"(stackPointer) : "r"(stackPointer));
   #elif defined(__i386__)
-    cout<<"bye"<<endl;
     #define JB_SP 4 
     #define JB_PC 5
     __asm__ __volatile__("xorl %%gs:0x18, %0\n\troll $9, %0" : "=r"(programCounter) : "r"(programCounter));
     __asm__ __volatile__("xorl %%gs:0x18, %0\n\troll $9, %0" : "=r"(stackPointer) : "r"(stackPointer));
   #endif
+
   environment->__jmpbuf[JB_SP] = stackPointer;
   environment->__jmpbuf[JB_PC] = programCounter;
+  sigemptyset(&environment->__saved_mask);
 }
 
 int Thread::getID() {
@@ -91,12 +86,6 @@ void* Thread::getArguments() {
   return arguments;
 }
 
-/*void (Thread::*getFunctionPointer(void))(void)
-{
-  cout<<threadId<<endl;
-  return functionPointer;
-}
-*/
 void Thread::sleep(int sec) {
   state = SLEEPING;
   /* Add code to start timer and on completion of timer add thread to ready queue */

@@ -5,11 +5,6 @@
 #include <map>
 #include <vector>
 
-// extern std::map<int, Thread*> threadMap;
-// extern std::vector<Thread*> readyQueue;  // can just maintain list of threadIds instead of entire thread contents
-
-
-
 int create(void (*f)(void));
 void dispatch(int);
 void start();
@@ -23,9 +18,8 @@ int createWithArgs(void* (*f)(void*), void *arg);
 void clean();
 void yield();
 void initTimer();
-void saveContext();
+int saveContext();
 void resumeContext();
 void terminate(int threadId);
-
 
 #endif /* MYTHREAD_H */
