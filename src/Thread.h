@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 
+typedef unsigned long long signal_time;
+
 enum ThreadState { RUNNING, READY, SLEEPING, SUSPENDED, TERMINATED, CREATED };
 
 struct statistics {
@@ -13,6 +15,7 @@ struct statistics {
   double totalSleepingTime;
   double avgExecutionTimeQuantum;
   double avgWaitingTime;
+  int totalRequestedSleepingTime;
 };
 
 class Thread {
@@ -29,9 +32,8 @@ class Thread {
     void *arguments;
     void *returnValue;
     char *cStack;
-    suseconds_t sleepTime;
-    struct timeval wakeUpTime;
-    struct timeval lastExecTime;
+    signal_time sleepTime;
+    signal_time wakeUpTime;
 
     Thread(void (*f)(void));
     Thread(void* (*f)(void*), void *);
@@ -42,7 +44,6 @@ class Thread {
     {
       return functionPointer;
     }
-    void sleep(int);
     void setState(ThreadState);
     int getState();
     unsigned int getBurstCount();

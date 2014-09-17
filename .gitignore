@@ -21,3 +21,5 @@
 *.zip
 *.gch
 *.*~
+*.diff
+*.patch

@@ -21,5 +21,7 @@ void initTimer();
 int saveContext();
 void resumeContext();
 void terminate(int threadId);
+void sleep(int);
+void wakeUp(int);
 
 #endif /* MYTHREAD_H */

@@ -1,5 +1,6 @@
 #include "MyThread.h"
 #include <iostream>
+#include <ctime>
 #include <signal.h>
 #include <unistd.h>
 #include <cstdlib>
@@ -9,8 +10,63 @@
 
 using namespace std;
 
+struct function_thread_map {
+  void (*signalHandler)(int);
+  bool type_dispatcher;
+};
+
 std::map<int, Thread*> threadMap;
+std::map<signal_time, int> sleepingQueue;
 std::vector<int> readyQueue;
+std::map<signal_time, function_thread_map*> signalHandlerMap;
+signal_time nextDispatcherInvokeTime = 0;
+
+void addSignalHandlerToMap(signal_time sec, void (*fptr)(int), bool isDispatch, int threadId = 0) {
+  function_thread_map *f_t_map = new function_thread_map;
+  f_t_map->signalHandler = fptr;
+  f_t_map->type_dispatcher = isDispatch;
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  signal_time execution_time = (signal_time)(tv.tv_sec + sec)*1000000 + tv.tv_usec;
+
+  if (isDispatch) {
+    std::map<signal_time, function_thread_map*>::iterator it;
+
+    it = signalHandlerMap.find(nextDispatcherInvokeTime);
+
+    if (it != signalHandlerMap.end()) {
+      signalHandlerMap.erase(it);
+    }
+
+    nextDispatcherInvokeTime = execution_time;
+  } else {
+    sleepingQueue.insert(std::pair<signal_time, int>(execution_time, threadId));
+  }
+
+  signalHandlerMap.insert(std::pair<signal_time, function_thread_map*>(execution_time, f_t_map));
+}
+
+void initTimer() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  signal_time current_time = (signal_time)tv.tv_sec*1000000 + tv.tv_usec;
+  // cout<<"Current time "<<current_time<<endl;
+  // cout<<"Exec time "<<nextDispatcherInvokeTime<<endl;
+
+  if(signalHandlerMap.size() > 0) {
+    signal_time execution_time = signalHandlerMap.begin()->first;
+    function_thread_map *f_t_map = signalHandlerMap.begin()->second;
+
+    signalHandlerMap.erase(signalHandlerMap.begin());
+
+    if (execution_time <= current_time) {
+      f_t_map->signalHandler(0);
+    } else {
+      signal(SIGALRM, f_t_map->signalHandler);
+      ualarm(execution_time - current_time, 0);
+    }
+  }
+}
 
 void start() {
   //code to start timer and execution of threads
@@ -25,8 +81,8 @@ void start() {
   	cout<<"pushed::"<<thread->getID()<<endl;
   }
 
-  signal(SIGALRM, dispatch);
-  alarm(INTERVAL);
+  addSignalHandlerToMap(INTERVAL, dispatch, true);
+  initTimer();
 
   thread = threadMap.begin()->second;
   thread->setState(RUNNING);
@@ -37,27 +93,6 @@ void start() {
   while(1) {}//infinite loop to stop termination of program
 
 }
-
-/*
-void initTimer() {
-  struct itimerval it_val;
-
-  //if (signal(SIGVTALRM, (void (*)(int)) alarm_handl) == SIG_ERR) {
-  if (signal(SIGVTALRM, alarm_handl) == SIG_ERR) {
-    cout<<"Unable to catch SIGALRM"<<endl;
-    exit(1);
-  }
-
-  it_val.it_value.tv_sec =     INTERVAL/1000;
-  it_val.it_value.tv_usec =    (INTERVAL*1000) % 1000000;        
-  it_val.it_interval = it_val.it_value;
-
-  if (setitimer(ITIMER_VIRTUAL, &it_val, NULL) == -1) {
-    cout<<"error calling setitimer()"<<endl;
-    exit(1);
-  }
-}
-*/
 
 void displayReadyQueue()
 {
@@ -103,6 +138,7 @@ void resumeContext() {
   	    thread->thread_stat->noOfBursts++;
   	    thread->setState(RUNNING);
         siglongjmp(thread->environment,1);
+        cout<<"RUNNING  "<<thread->getID()<<endl;
   	  }
   	}
   }
@@ -111,8 +147,8 @@ void resumeContext() {
 void dispatch(int sig) {
   if (readyQueue.size() > 0) {
     // cout<<"SWITCH: ret_val="<<ret_val<<endl;
-    alarm(1);
-    signal(SIGALRM, dispatch);
+    addSignalHandlerToMap(INTERVAL, dispatch, true);
+    initTimer();
     if (saveContext() == -1) {
       return;
     }
@@ -150,7 +186,7 @@ void run(int threadId) {
   if (threaMapIt != threadMap.end()) {
     Thread *thread = threaMapIt->second;
 
-    if (thread->getState() == RUNNING || thread->getState() == READY) {
+    if (thread->getState() == RUNNING || thread->getState() == READY || thread->getState() == TERMINATED) {
       return;
     }
 
@@ -170,8 +206,10 @@ void suspend(int threadId) {
   if (it != readyQueue.end()) {
   	if (it == readyQueue.begin()) {
   	  saveContext();
-  	  resumeContext(); //check if we need to inittimer here again to reset
-  	  readyQueue.pop_back();
+      readyQueue.pop_back();
+      addSignalHandlerToMap(INTERVAL, dispatch, true);
+      initTimer();
+  	  resumeContext();
   	} else {
   	  readyQueue.erase(it);
   	}
@@ -211,7 +249,9 @@ void deleteThread(int threadId) {
   if (it != readyQueue.end()) {
   	if (it == readyQueue.begin()) {
   	  readyQueue.erase(readyQueue.begin());
-  	  resumeContext(); //check if we need to inittimer here again to reset
+      addSignalHandlerToMap(INTERVAL, dispatch, true);
+      initTimer();
+  	  resumeContext();
   	} else {
   	  readyQueue.erase(it);
   	}
@@ -240,7 +280,9 @@ void terminate(int threadId) {
   if (it != readyQueue.end()) {
   	if (it == readyQueue.begin()) {
   	  readyQueue.erase(readyQueue.begin());
-  	  resumeContext(); //check if we need to inittimer here again to reset
+      addSignalHandlerToMap(INTERVAL, dispatch, true);
+      initTimer();
+  	  resumeContext();
   	  // cout<<"in terminate"<<endl;
 
   	  // readyQueue.pop_back();
@@ -258,6 +300,53 @@ void terminate(int threadId) {
   }
 
   // cout<<"in terminate"<<endl;
+}
+
+void sleep(int sec) {
+  if (readyQueue.size() > 0) {
+    std::map<int, Thread*>::iterator threaMapIt;
+    threaMapIt = threadMap.find(*(readyQueue.begin()));
+
+    if (threaMapIt != threadMap.end()) {
+      Thread *thread = threaMapIt->second;
+
+      if (thread->getState() == RUNNING) {
+        saveContext();
+        readyQueue.pop_back();
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        thread->sleepTime = (signal_time)tv.tv_sec*1000000 + tv.tv_usec;
+        thread->thread_stat->totalRequestedSleepingTime += sec;
+        thread->setState(SLEEPING);
+        addSignalHandlerToMap(sec, wakeUp, false, thread->getID());
+        initTimer();
+        resumeContext();
+      }
+    }
+  }
+}
+
+void wakeUp(int sig) {
+  if (sleepingQueue.size() > 0) {
+    std::map<int, Thread*>::iterator threaMapIt;
+    threaMapIt = threadMap.find(sleepingQueue.begin()->second);
+    sleepingQueue.erase(sleepingQueue.begin());
+
+    if (threaMapIt != threadMap.end()) {
+      Thread *thread = threaMapIt->second;
+
+      if (thread->getState() == SLEEPING) {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        thread->wakeUpTime = (signal_time)tv.tv_sec*1000000 + tv.tv_usec;
+        thread->thread_stat->totalSleepingTime += (thread->wakeUpTime - thread->sleepTime)/1000000.0;
+        thread->setState(READY);
+        readyQueue.push_back(thread->getID());
+      }
+    }
+  }
+
+  initTimer();
 }
 
 statistics* getStatus(int threadId) {
@@ -311,8 +400,16 @@ void printStatus(int threadId)
       cout<<"Thread Average Execution Time Quantum: "<<thread->getAvgExecutionTimeQuantum()<<endl;
       cout<<"Thread Average Waiting Time: "<<thread->getAvgWaitingTime()<<endl;
     }
+
+    if (thread->thread_stat->totalRequestedSleepingTime == 0) {
+      cout<<"Thread Total Requested Sleeping Time: N/A"<<endl;
+    } else {
+      cout<<"Thread Total Requested Sleeping Time: "<<thread->thread_stat->totalRequestedSleepingTime<<endl;
+    }
+
     cout<<endl;
 }
+
 void clean() {
   //stop timer
   std::map<int, Thread*>::iterator it;

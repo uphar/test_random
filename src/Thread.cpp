@@ -15,6 +15,7 @@ Thread::Thread(void (*function)(void)) {
   thread_stat->totalSleepingTime = 0;
   thread_stat->avgExecutionTimeQuantum = 0;
   thread_stat->avgWaitingTime = 0;
+  thread_stat->totalRequestedSleepingTime = 0;
   withArguments = false;
   cStack = new char[STACK_SIZE];
   
@@ -49,6 +50,7 @@ Thread::Thread(void* (*function)(void*), void* arguments) {
   thread_stat->totalSleepingTime = 0;
   thread_stat->avgExecutionTimeQuantum = 0;
   thread_stat->avgWaitingTime = 0;
+  thread_stat->totalRequestedSleepingTime = 0;
   withArguments = true;
   this->arguments = arguments;
   returnValue = NULL;
@@ -84,11 +86,6 @@ bool Thread::isWithArguments() {
 
 void* Thread::getArguments() {
   return arguments;
-}
-
-void Thread::sleep(int sec) {
-  state = SLEEPING;
-  /* Add code to start timer and on completion of timer add thread to ready queue */
 }
 
 void Thread::setState(ThreadState state) {
